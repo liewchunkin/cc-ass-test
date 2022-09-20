@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="emp.css">
+	<title>Attendance Employee</title>
+</head>
+<center>
+	<font color="black" size="4" style="font-family: avenir">
+
+		<h1 style="color: DodgerBlue">Employee Database</h1>
+
+		<body bgcolor="lightgrey">
+
+			<form action="/attendanceemp" autocomplete="on" method = "POST" enctype="multipart/form-data">
+		  		Employee ID:<br> <input class="general" type="number" name="emp_id" autofocus size="40"><br>
+		  		<button type="submit" formaction="/cin" style="background: grey; height: 45px; width: 200px; color: white; size: 5; font:oblique;">CHECK IN</button>
+                <button type="submit" formaction="/attendanceemp/cout" style="background: grey; height: 45px; width: 200px; color: white; size: 5; font:oblique;">CHECK OUT</button>
+			</form>
+<a href="/about">About Us</a>
+		</body>
+
+	</font>
+</center>
+</html>
