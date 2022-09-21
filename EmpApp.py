@@ -1,10 +1,8 @@
-from tkinter import E
 from flask import Flask, render_template, request
 from pymysql import connections
 import os
 import boto3
 from config import *
-from datetime import date
 
 app = Flask(__name__)
 
@@ -82,45 +80,85 @@ def AddEmp():
     print("all modification done...")
     return render_template('AddEmpOutput.html', name=emp_name)
 
-@app.route("/cin", methods=['POST'])
-def checkin():
-    try:
-        emp_id = request.form['emp_id']
-        selectSQL = "SELECT * FROM employee WHERE emp_id = "+emp_id
-        cursor = db_conn.cursor()
-        cursor.execute(selectSQL)
-        result = cursor.fetchall()
-        if(len(result)!=0):
-            querySQL = "INSERT INTO attendance(emp_id, check_in, check_out, payroll) VALUES(%s, %s, '', -1)"
-            cursor.execute(querySQL, (emp_id, date.today().strftime("%d-%m-%y")))
-            db_conn.commit()
-        else:
-            print ("<script>alert('No user found!!');</script>")
-    except Exception as e :
-        return str(e)
-    finally:
-        cursor.close()
-    return render_template('cin.html', empId=emp_id)
+# Get Employee
+@app.route("/getemp", methods=['GET', 'POST'])
+def GetEmp():
+    return render_template('GetEmp.html')
 
-@app.route("/cout", methods=['POST'])
-def checkout():
-    try:
-        emp_id = request.form['emp_id']
-        selectSQL = "SELECT * FROM employee WHERE emp_id = "+emp_id
-        cursor = db_conn.cursor()
-        cursor.execute(selectSQL)
-        result = cursor.fetchall()
-        if(len(result)!=0):
-            querySQL = "UPDATE attendance SET check_out = %s WHERE emp_id = %s"
-            cursor.execute(querySQL, (date.today().strftime("%d-%m-%y"), emp_id))
-            db_conn.commit()
-        else:
-            print ("<script>alert('No user found!!');</script>")
-    except Exception as e :
-        return str(e)
-    finally:
+@app.route("/getempoutput", methods=['POST'])
+def GetEmpOutput():
+    s3 = boto3.resource('s3')
+    emp_id = request.form['emp_id']
+    emp_name = ""
+    emp_loc = ""
+    emp_pri_skill = ""
+    emp_img = ""
+    selectSQL = "SELECT * FROM employee WHERE emp_id = %s"
+    cursor = db_conn.cursor()
+    cursor.execute(selectSQL, (emp_id))
+    result = cursor.fetchall()
+    if(len(result)>0):
+        for i in result:
+            emp_image_file_name_in_s3 = "emp-id-" + str(emp_id) + "_image_file"
+            emp_fname = i[1]
+            emp_lname = i[2]
+            emp_loc = i[4]
+            emp_pri_skill = i[3]
+            bucket_location = boto3.client('s3').get_bucket_location(Bucket=custombucket)
+            s3_location = (bucket_location['LocationConstraint'])
+            if s3_location is None:
+                s3_location = ''
+            else:
+                s3_location = '-' + s3_location
+            object_url = "https://s3{0}.amazonaws.com/{1}/{2}".format(
+                s3_location,
+                custombucket,
+                emp_image_file_name_in_s3)
+            cursor.close()
+            return render_template('GetEmpOutput.html', emp_id_output=emp_id, fname=emp_fname, lname=emp_lname, emp_loc_output=emp_loc, emp_pri_skill_output=emp_pri_skill, emp_img=object_url)
+    else:
         cursor.close()
-    return render_template('AttendanceEmp.html', empId=emp_id)
+        return("No User Found")
+   
+
+
+# Delete Employee
+@app.route("/delemp", methods=['GET','POST'])
+def DelEmp():
+    return render_template('DelEmp.html')
+
+@app.route("/delempoutput", methods=['POST'])
+def DelEmpOutput():
+    emp_id = request.form['emp_id']
+    selectSQL = "SELECT * FROM employee WHERE emp_id = %s"
+    cursor = db_conn.cursor()
+    cursor.execute(selectSQL, (emp_id))
+    result = cursor.fetchone()
+    if(len(result)>0):
+        nameUser = result[1]+" "+result[2]
+
+        emp_image_file_name_in_s3 = "emp-id-" + str(emp_id) + "_image_file"
+        s3 = boto3.resource('s3')
+        try:
+            selectSQL = "DELETE FROM employee WHERE emp_id = %s"
+            cursor.execute(selectSQL, (emp_id))
+            db_conn.commit()
+            print("Data deleted from MySQL RDS... deleting image from S3...")
+            boto3.client('s3').delete_object(Bucket=custombucket, Key=emp_image_file_name_in_s3)
+        except Exception as e:
+            return str(e)
+
+        finally:
+            cursor.close()
+
+        print("all modification done...")
+        return render_template('DelEmpOutput.html', name=nameUser)
+    else:
+        cursor.close()
+        return("No User Found")
+    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
+
+    
